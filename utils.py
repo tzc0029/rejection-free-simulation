@@ -90,11 +90,13 @@ def get_react_candidate(react_stoic, init_state, center, neighbours_id, idx_empt
 '''
 Update lattice when reactions are decided
 '''
-def update_events(react_vec, prod_vec, lattice, neighbours_random, init_state, data_record, epoch):
-    react_vec_view = copy.deepcopy(react_vec)
-    prod_vec_view = copy.deepcopy(prod_vec)
+def update_events(sim, reaction_idx, lattice, neighbours_random, data_record, epoch):
+    react_vec_view = copy.deepcopy(sim._react_stoic[:,reaction_idx])
+    prod_vec_view = copy.deepcopy(sim._prod_stoic[:,reaction_idx])
+    init_state_view = copy.deepcopy(sim._init_state)
+    
     ######## in order to keep track of CO #####
-    if prod_vec[5] != 0:
+    if prod_vec_view[5] != 0:
         data_record[5][epoch+1] += 1
     ###########################################
 
@@ -104,14 +106,14 @@ def update_events(react_vec, prod_vec, lattice, neighbours_random, init_state, d
         for i in range(len(react_vec_view)):
             if react_vec_view[i] > 0:
                 react_vec_view[i] -= 1
-                if init_state[i] != 0:
+                if init_state_view[i] != 0:
                     react.append(i)
                     
     while not all(s == 0 for s in prod_vec_view):
         for j in range(len(prod_vec_view)):
             if prod_vec_view[j] > 0:
                 prod_vec_view[j] -= 1
-                if init_state[j] != 0:
+                if init_state_view[j] != 0:
                     product.append(j)
     random.shuffle(react)
     random.shuffle(product)

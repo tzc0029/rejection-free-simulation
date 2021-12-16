@@ -10,7 +10,7 @@ from math import e
 import matplotlib
 import numpy as np, argparse, sys, random, os
 from os import path
-from utils_backup import *
+from utils import *
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from cayenne.simulation import Simulation
@@ -26,11 +26,11 @@ def main():
         const compartment comp1;
         comp1 = 1; # volume of compartment
         r1: CO_g + E => CO_s; k1;
-        r3: O2_g + 2E => 2O_s; k3;
-        r5: CO_s + O_s => CO2_g + 2E; k5;
+        r2: O2_g + 2E => 2O_s; k2;
+        r3: CO_s + O_s => CO2_g + 2E; k3;
         k1 = 5.78e5;
-        k3 = 1.62e5;
-        k5 = 1.71e2;
+        k2 = 1.62e5;
+        k3 = 1.71e2;
         CO_g = 0;
         CO_s = 1;
         E = 1;
@@ -156,7 +156,7 @@ def main():
 
         cumu_time += -np.log(r2)/Gamma_total
 
-        # get all neighbours with predefined order (up, right, down, left)
+        # get all neighbours with predefined order (center, up, right, down, left)
         neighbours = check_neighbours(row, col, n)
         # also create a random version
         neighbours_random = neighbours.copy()
@@ -166,8 +166,24 @@ def main():
         
         neighbours_id = position_to_id(neighbours, lattice)
         update_records(data_record, i)
-        change_log = update_events(sim._react_stoic[:,reaction_idx], sim._prod_stoic[:,reaction_idx], lattice, neighbours_random, sim._init_state, data_record, i)
+
+        # 
+        change_log = update_events(sim, reaction_idx, lattice, neighbours_random, data_record, i)
         
+        '''
+        since we know which site(s) was(were) changed, let's get a list of neighbours surrounding it(them)
+        ooooooooooo     
+        ooooo.ooooo
+        oooo.x.oooo
+        ooooo.ooooo
+        ooooooooooo
+            or
+        ooooooooooo
+        ooooo..oooo
+        oooo.xx.ooo
+        ooooo..oooo
+        ooooooooooo
+        '''
         change_cand = []
         for rowp, colp in change_log:
             neighbours = check_neighbours(rowp, colp, n)
@@ -175,18 +191,29 @@ def main():
                 if item not in change_cand:
                     change_cand.append(item)
 
+        '''
+        change_cand should contains 5 or 8 sites, re-evaluate them and update E, N_j, Gamma_total accordingly
+        '''
         for rowpp, colpp in change_cand:
             # we let all candidates be 0 first, then decide their E
+            # for every reaction
             for indx in range(len(E)):
+                # if this site of this reaction is positive
                 if E[indx][rowpp,colpp] == 1:
+                    # invert the site into negative, deduct N_j and Gamma_total accordingly
                     E[indx][rowpp,colpp] = 0
                     N_j[indx] -= 1
                     Gamma_total -= 1 * sim._k_det[indx]
+            # In order to re-evaluate this site, get its neighbours, orders don't matter
             neighbours = check_neighbours(rowpp, colpp, n)
             neighbours_id = position_to_id(neighbours, lattice)
+            # get a list of reactions that can happen on this site
             e = get_react_candidate(sim._react_stoic, sim._init_state, lattice[rowpp, colpp], neighbours_id, idx_empty)
+            # update E, N_j, Gamma_total, for each reactions accordingly
             for rx in e:
+                # if this site of this reaction is negative
                 if E[rx][rowpp,colpp] != 1:
+                    # invert the site into positive, increment N_j and Gamma_total accordingly
                     E[rx][rowpp,colpp] = 1
                     N_j[rx] += 1
                     Gamma_total += 1 * sim._k_det[rx]
